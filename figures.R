@@ -39,31 +39,57 @@ cont_p1 + cont_p2 +
 
 
 # figure 2 ----------------------------------------------------------------
-# not used in manuscript
+df_target = haven::read_dta("targeting_data.dta")
+df_target = df_target %>% 
+  mutate(treatment_cat = case_when(
+    treatment == 1 ~ 'Equal',
+    treatment == 2 ~ 'Unearned', # unequal (high/low)
+    treatment == 3 ~ 'Earned')) %>% # unequal (high/low)
+  mutate(treatment_cat = forcats::fct_relevel(treatment_cat, 
+                                              c('Equal', 
+                                                'Unearned', 
+                                                'Earned')))
+p1 = df_target %>% 
+  filter(treatment != 1) %>% 
+  filter(target_endowment == 70) %>%
+  mutate(cont_binned = cut(target_contribution,
+                           breaks = seq(0, 70, by = 5),
+                           include.lowest = TRUE,
+                           right = FALSE,
+                           labels = paste0("[", seq(0, 65, by = 5), ",", seq(5, 70, by = 5), ")"))) %>%
+  group_by(treatment_cat, cont_binned) %>%
+  summarise(
+    s = mean(target_sanction),
+    se = sd(target_sanction) / sqrt(n())  # Calculate standard error
+  ) %>%
+  ggplot(aes(x = cont_binned, y = s, fill = treatment_cat)) +
+  geom_col(position = 'dodge') +
+  geom_errorbar(aes(ymin = s - se, ymax = s + se), width = 0.2, position = position_dodge(width = 0.9)) +  # Add error bars
+  labs(x = 'Binned Contributions', y = 'Average Punishment Received', subtitle = 'High Types') + 
+  scale_fill_manual(values = c('orange', "blue"), name = "") + 
+  custom_theme 
 
-pun_p1 = df %>%
-  filter(period > 1 & treatment != 1) %>% # effort task
-  mutate(did_pun = ifelse(sanctioncost > 0, 1, 0)) %>% 
-  group_by(type_cat, treatment_cat) %>% 
-  ggplot(aes(x = treatment_cat, y = did_pun, fill = type_cat)) + 
-  stat_summary(fun = 'mean', geom = 'bar', position = 'dodge', alpha = 0.75) + 
-  stat_summary(fun.data = 'mean_se', geom = 'errorbar', width = 0.1, position = position_dodge(width=0.9)) + 
-  scale_fill_manual(values = c('orange', 'blue'), name = "") +
-  scale_y_continuous(labels = scales::percent) + 
-  labs(x = "", y = 'Punishment Received Rate') + 
-  custom_theme + 
-  theme(legend.position = c(0.85, 0.85))
+p2 = df %>%
+  filter(period > 4) %>%
+  filter(type_cat == "Low") %>%
+  filter(treatment_cat != "Equal") %>%
+  mutate(cont_binned = cut(contribute,
+                           breaks = seq(0, 30, by = 5),
+                           include.lowest = TRUE,
+                           right = FALSE,
+                           labels = paste0("[", seq(0, 25, by = 5), ",", seq(5, 30, by = 5), ")"))) %>%
+  group_by(treatment_cat, cont_binned) %>%
+  summarise(
+    s = mean(sanctioncost),
+    se = sd(sanctioncost) / sqrt(n())  # Calculate standard error
+  ) %>%
+  ggplot(aes(x = cont_binned, y = s, fill = treatment_cat)) +
+  geom_col(position = 'dodge') +
+  geom_errorbar(aes(ymin = s - se, ymax = s + se), width = 0.2, position = position_dodge(width = 0.9)) +  # Add error bars
+  labs(x = 'Binned Contributions', y = 'Average Punishment Received', subtitle = 'Low Types') + 
+  scale_fill_manual(values = c('orange', "blue"), name = "") + 
+  custom_theme 
 
 
-pun_p2 = df %>% 
-  filter(period > 4 & treatment != 1 & sanctioncost > 0) %>% 
-  ggplot(aes(x = treatment_cat, y = sanctioncost, fill = type_cat)) +
-  geom_boxplot(alpha = 0.75, outlier.alpha = 0.25) +
-  scale_fill_manual(values = c('orange', 'blue'), name = "") +
-  labs(x = "", y = 'Punishment Received',
-       caption = 'Only non-zero punishment') + 
-  custom_theme + 
-  theme(legend.position = c(0.85, 0.85))
-
-pun_p1 + pun_p2  + 
-  plot_annotation(tag_levels = 'A')
+p1 + p2 + 
+  plot_layout(guides = 'collect')
